@@ -10,6 +10,7 @@ export interface UserProfile {
   nvidiaApiKey?: string;
   selectedAiProvider?: string;
   language?: string;
+  plan?: 'Free' | 'Pro' | 'Premium';
   createdAt: number;
 }
 

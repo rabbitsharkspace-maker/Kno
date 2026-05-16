@@ -3,7 +3,7 @@ import {
     ArrowLeft, Database, Inbox, Brain, Trash2, Link, ArrowRight, 
     Loader2, X, AlertTriangle, Zap, Plus, 
     MousePointer2, Move, LayoutGrid, Save, ZoomIn, ZoomOut, FileText,
-    Check, Edit2, BrainCircuit, Play, FileUp, Sparkles, RotateCw, Shield, CheckCircle2, FlaskConical, Undo2, Redo2, ChevronLeft, ChevronRight, ChevronDown, HelpCircle, MessageSquare, RefreshCw, Download, FileUp as FileExport, Hexagon, FileSpreadsheet, FileCode, Lock, Mic, Share2
+    Check, Edit2, BrainCircuit, Play, FileUp, Sparkles, RotateCw, Shield, CheckCircle2, FlaskConical, Undo2, Redo2, ChevronLeft, ChevronRight, ChevronDown, HelpCircle, MessageSquare, RefreshCw, Download, FileUp as FileExport, Hexagon, FileSpreadsheet, FileCode, Lock, Mic, Share2, FileOutput
 } from 'lucide-react';
 import { analyzeFallacy, extractKeywordsForGrouping, getModel, getAI } from '../services/geminiService';
 import { GoogleGenAI } from "@google/genai";
@@ -1128,12 +1128,12 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
 
     // The saveToStorage logic has been moved to pushHistory to prevent saving on every render/drag step
 
-    const handleExport = async (format: 'pdf' | 'md') => {
+    const handleExport = async (format: 'pdf' | 'md' | 'docx') => {
         if (!canUsePremiumFeatures('Export')) return;
         if (!activeCanvas) return;
         setIsExporting(true);
         try {
-            if (format === 'md') {
+            if (format === 'md' || format === 'docx') {
                 const sourceCount = localNodes.length;
                 const fallacyCount = localNodes.filter(n => n.critique?.isSafe === false || n.critique?.structuredAnalysis?.logic.status.toLowerCase().includes('fallacy')).length;
                 const insightCount = localNodes.filter(n => ['spark', 'insight', 'synthesis'].includes(n.type)).length;
@@ -1163,19 +1163,73 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
                     md += `---\n\n`;
                 });
                 md += `*Powered by Kno & Gemini 2.0 Flash - Spatial Knowledge OS*`;
-                const blob = new Blob([md], { type: 'text/markdown' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${activeCanvas.title.replace(/\s+/g, '_')}_Brief.md`;
-                a.click();
+
+                if (format === 'md') {
+                    const blob = new Blob([md], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${activeCanvas.title.replace(/\s+/g, '_')}_Brief.md`;
+                    a.click();
+                } else if (format === 'docx') {
+                    // Simple Word Export using HTML shim
+                    const html = `
+                        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                        <head><meta charset='utf-8'><title>${activeCanvas.title}</title>
+                        <style>
+                            body { font-family: 'Calibri', sans-serif; }
+                            h1 { color: #1a1a1a; }
+                            h2 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                            blockquote { background: #f9f9f9; border-left: 10px solid #ccc; margin: 1.5em 10px; padding: 0.5em 10px; }
+                        </style>
+                        </head>
+                        <body>
+                            ${md.replace(/\n/g, '<br>').replace(/#(.*)/g, '<h1>$1</h1>').replace(/##(.*)/g, '<h2>$1</h2>').replace(/###(.*)/g, '<h3>$1</h3>').replace(/\*(.*)/g, '<li>$1</li>').replace(/> (.*)/g, '<blockquote>$1</blockquote>')}
+                            <br><br>
+                            <img src="${window.location.origin}/RabbitShark%20logo.png" width="60" style="float: right;">
+                        </body>
+                        </html>
+                    `;
+                    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${activeCanvas.title.replace(/\s+/g, '_')}_Brief.doc`;
+                    a.click();
+                }
             } else if (format === 'pdf') {
+                // Fetch logo data first
+                let logoData = '';
+                try {
+                    const response = await fetch('/RabbitShark%20logo.png');
+                    const blob = await response.blob();
+                    logoData = await new Promise<string>((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (e) {
+                    console.warn("Could not load logo for export", e);
+                }
+
                 const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+                
+                const addLogo = (targetDoc: jsPDF) => {
+                    if (!logoData) return;
+                    const pWidth = targetDoc.internal.pageSize.getWidth();
+                    const pHeight = targetDoc.internal.pageSize.getHeight();
+                    const logoSize = 15; 
+                    const margin = 10;
+                    // Add the logo image to the bottom right corner of the current page
+                    targetDoc.addImage(logoData, 'PNG', pWidth - logoSize - margin, pHeight - logoSize - margin, logoSize, logoSize);
+                };
+
                 const pageWidth = doc.internal.pageSize.getWidth();
                 const pageHeight = doc.internal.pageSize.getHeight();
                 let yPos = 20;
                 const margin = 20;
                 const contentWidth = pageWidth - (margin * 2);
+
                 doc.setFillColor(0, 0, 0); 
                 doc.rect(0, 0, pageWidth, 25, 'F');
                 doc.setTextColor(255, 255, 255);
@@ -1188,6 +1242,7 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
                 doc.setFont("helvetica", "bold");
                 doc.text(activeCanvas.title, margin, yPos);
                 yPos += 10;
+
                 if (canvasRef.current) {
                     try {
                         const canvasImg = await html2canvas(canvasRef.current, { 
@@ -1207,8 +1262,13 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
                         yPos += Math.min(pdfImgHeight, maxImgHeight) + 15;
                     } catch (e) { }
                 }
+
                 localNodes.forEach((node, i) => {
-                    if (yPos > pageHeight - 40) { doc.addPage(); yPos = 20; }
+                    if (yPos > pageHeight - 40) { 
+                        addLogo(doc);
+                        doc.addPage(); 
+                        yPos = 20; 
+                    }
                     doc.setFontSize(14);
                     doc.setFont("helvetica", "bold");
                     doc.setTextColor(50, 50, 50); 
@@ -1223,9 +1283,9 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
                     const splitContent = doc.splitTextToSize(cleanContent, contentWidth);
                     doc.text(splitContent, margin, yPos);
                     yPos += (splitContent.length * 5) + 5;
+
                     if (node.critique) {
                         const audit = node.critique.structuredAnalysis || {
-                            // Fix: Corrected variable name from note to node to fix 'Cannot find name note' error
                             factual: { status: 'N/A', issue: node.critique.issue || '' },
                             balance: { status: 'N/A', check: '' },
                             logic: { status: node.critique.isSafe ? 'Safe' : 'Issues', type: '', explanation: node.critique.fix || '' }
@@ -1243,7 +1303,11 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
                         const blockSpacing = 3;
                         const totalLines = fLines.length + bLines.length + lLines.length;
                         const boxHeight = (totalLines * lineHeight) + (padding * 2) + (blockSpacing * 2);
-                        if (yPos + boxHeight > pageHeight - 20) { doc.addPage(); yPos = 20; }
+                        if (yPos + boxHeight > pageHeight - 20) { 
+                            addLogo(doc);
+                            doc.addPage(); 
+                            yPos = 20; 
+                        }
                         doc.setFillColor(248, 250, 252); 
                         doc.setDrawColor(200, 200, 200);
                         doc.roundedRect(margin, yPos, contentWidth, boxHeight, 3, 3, 'FD');
@@ -1257,6 +1321,8 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
                     }
                     yPos += 5;
                 });
+                // Add logo to the last page
+                addLogo(doc);
                 doc.save(`${activeCanvas.title.replace(/\s+/g, '_')}_InsightBrief.pdf`);
             }
         } catch (e) {
@@ -3448,6 +3514,9 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
                     </button>
                     <button onClick={() => handleExport('md')} disabled={isExporting} className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all font-bold text-xs flex items-center text-gray-700 hover:text-black cursor-pointer pointer-events-auto">
                         <FileText className="w-3 h-3 mr-2" /> MD
+                    </button>
+                    <button onClick={() => handleExport('docx')} disabled={isExporting} className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all font-bold text-xs flex items-center text-gray-700 hover:text-black cursor-pointer pointer-events-auto">
+                        <FileOutput className="w-3 h-3 mr-2" /> Word
                     </button>
                 </div>
             )}

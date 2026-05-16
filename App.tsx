@@ -71,6 +71,7 @@ const DEFAULT_INBOX: InboxItem[] = [];
 const App: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
 
   const [view, setView] = useState<ViewState>('canvas');
   const [theme] = useState<AppTheme>(AppTheme.MINIMAL);
@@ -91,6 +92,7 @@ const App: React.FC = () => {
       customApiKey: localStorage.getItem('customApiKey') || '',
       openaiApiKey: localStorage.getItem('openaiApiKey') || '',
       language: localStorage.getItem('system_language') || 'English',
+      plan: 'Pro',
       createdAt: Date.now()
     };
     
