@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (matches request.auth.uid)
+    // Fields:
+    //   - uid: string (required, immutable)
+    //   - email: string (required, immutable)
+    //   - displayName: string (optional)
+    //   - plan: string (required, enum: ['Free', 'Basic', 'Professional', 'Architect'])
+    //   - usageCount: number (required)
+    //   - logicGuardUsageCount: number (required)
+    //   - lastUsageReset: number (required)
+    //   - createdAt: number (required, immutable)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      // Check if the user is authenticated and matches the userId
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Domain Validators
+    function isValidUser(data) {
+      // Allow displayName and language to be optional
+      let hasValidDisplayName = !('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100);
+      let hasValidLanguage = !('language' in data) || (data.language is string && data.language.size() <= 10);
+      let hasValidLogicGuardUsageCount = !('logicGuardUsageCount' in data) || (data.logicGuardUsageCount is number && data.logicGuardUsageCount >= 0);
+      let hasValidUsageCount = !('usageCount' in data) || (data.usageCount is number && data.usageCount >= 0);
+      let hasValidLastUsageReset = !('lastUsageReset' in data) || (data.lastUsageReset is number);
+      let hasValidCreatedAt = !('createdAt' in data) || (data.createdAt is number);
+      let hasValidCustomApiKey = !('customApiKey' in data) || (data.customApiKey is string && data.customApiKey.size() <= 200);
+      let hasValidOpenaiApiKey = !('openaiApiKey' in data) || (data.openaiApiKey is string && data.openaiApiKey.size() <= 200);
+      let hasValidAnthropicApiKey = !('anthropicApiKey' in data) || (data.anthropicApiKey is string && data.anthropicApiKey.size() <= 200);
+      let hasValidBillingDueDate = !('billingDueDate' in data) || (data.billingDueDate is number);
+      
+      return hasRequiredFields(['uid', 'email', 'plan']) &&
+             hasOnlyAllowedFields(['uid', 'email', 'displayName', 'plan', 'usageCount', 'logicGuardUsageCount', 'lastUsageReset', 'createdAt', 'language', 'customApiKey', 'openaiApiKey', 'anthropicApiKey', 'billingDueDate']) &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 128 &&
+             isValidEmail(data.email) &&
+             hasValidDisplayName &&
+             hasValidLanguage &&
+             hasValidLogicGuardUsageCount &&
+             hasValidUsageCount &&
+             hasValidLastUsageReset &&
+             hasValidCreatedAt &&
+             hasValidCustomApiKey &&
+             hasValidOpenaiApiKey &&
+             hasValidAnthropicApiKey &&
+             hasValidBillingDueDate &&
+             data.plan in ['Free', 'Basic', 'Platform', 'Professional', 'Architect'];
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+
+    match /users/{userId} {
+      // Users can create their own profile
+      allow create: if isOwner(userId) && 
+                       isValidUser(request.resource.data) && 
+                       uidUnchanged() &&
+                       (!('usageCount' in request.resource.data) || request.resource.data.usageCount == 0) &&
+                       (!('logicGuardUsageCount' in request.resource.data) || request.resource.data.logicGuardUsageCount == 0);
+                       
+      // Users can read their own profile
+      allow read: if isOwner(userId);
+      
+      // Users can update their own profile (e.g., usage counts, upgrading plan)
+      // In a real app, upgrading plan should be done via a secure backend webhook (e.g., Stripe),
+      // but for this prototype, we allow the client to update it.
+      allow update: if isOwner(userId) && 
+                       isValidUser(request.resource.data) && 
+                       uidNotModified() &&
+                       (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt) &&
+                       (!('email' in resource.data) || request.resource.data.email == resource.data.email);
+                       
+      allow delete: if false; // Prevent deletion for now
+    }
+    
+    match /users/{userId}/appData/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

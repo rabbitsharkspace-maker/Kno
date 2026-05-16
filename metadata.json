@@ -1,0 +1,8 @@
+{
+  "name": "Remix: kno - rabbitshark",
+  "description": "A minimalist AI Knowledge Internalization Engine. Capture content, distill wisdom with AI, and internalize it through spaced repetition.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

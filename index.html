@@ -1,0 +1,222 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+    <title>Kno - Knowledge Engine</title>
+    <link rel="icon" type="image/png" href="/kno.png">
+    <link rel="preload" href="/kno.png" as="image">
+    <link rel="preload" href="/ko.png" as="image">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+            colors: {
+              minimal: {
+                bg: '#f9fafb', // Gray 50
+                card: '#ffffff',
+                text: '#111827', // Gray 900
+                accent: '#18181b', // Zinc 950
+                secondary: '#e5e7eb', // Gray 200
+              },
+              serenity: {
+                bg: '#f0fdf4', // Green 50
+                card: '#ffffff',
+                text: '#14532d', // Green 900
+                accent: '#15803d', // Green 700
+                secondary: '#dcfce7', // Green 100
+              },
+              ember: {
+                bg: '#fef2f2', // Red 50
+                card: '#ffffff',
+                text: '#7f1d1d', // Red 900
+                accent: '#dc2626', // Red 600
+                secondary: '#fee2e2', // Red 100
+              },
+              breeze: {
+                bg: '#f0f9ff', // Sky 50
+                card: '#ffffff',
+                text: '#0c4a6e', // Sky 900
+                accent: '#0284c7', // Sky 600
+                secondary: '#e0f2fe', // Sky 100
+              },
+              lavender: {
+                bg: '#faf5ff', // Purple 50
+                card: '#ffffff',
+                text: '#581c87', // Purple 900
+                accent: '#9333ea', // Purple 600
+                secondary: '#f3e8ff', // Purple 100
+              }
+            },
+            animation: {
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'float': 'float 6s ease-in-out infinite',
+              'fade-in': 'fadeIn 0.5s ease-out forwards',
+              'slide-up': 'slideUp 0.4s ease-out forwards',
+              'highlight': 'highlight 0.5s ease-out forwards',
+              'scanline': 'scanline 3s linear infinite',
+              'scale-in': 'scaleIn 0.2s ease-out forwards',
+              'fly-out': 'flyOut 0.5s ease-in forwards',
+              'spin-slow': 'spin 12s linear infinite',
+              'spin-reverse-slow': 'spin-reverse 12s linear infinite',
+            },
+            keyframes: {
+              'spin-reverse': {
+                from: { transform: 'rotate(360deg)' },
+                to: { transform: 'rotate(0deg)' },
+              },
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-10px)' },
+              },
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(20px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              },
+              highlight: {
+                '0%': { width: '0%' },
+                '100%': { width: '100%' },
+              },
+              scanline: {
+                '0%': { top: '-20%' },
+                '100%': { top: '100%' },
+              },
+              scaleIn: {
+                '0%': { transform: 'scale(0.9)', opacity: '0' },
+                '100%': { transform: 'scale(1)', opacity: '1' },
+              },
+              flyOut: {
+                '0%': { transform: 'translateY(0) scale(1)', opacity: '1' },
+                '100%': { transform: 'translateY(-100px) scale(0.5)', opacity: '0' },
+              }
+            },
+            boxShadow: {
+              'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+              'glow': '0 0 15px rgba(0, 0, 0, 0.1)',
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      /* Modern Font Import */
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+      
+      body, html {
+        font-family: 'Inter', sans-serif;
+        overscroll-behavior: none; /* Prevents Mac bounce */
+        overflow: hidden; /* Stops browser scrolling */
+      }
+
+      /* Hide scrollbar */
+      .no-scrollbar::-webkit-scrollbar {
+          display: none;
+      }
+      .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+      }
+
+      /* Typewriter Cursor */
+      .typewriter-cursor::after {
+        content: '|';
+        animation: cursor-blink 1s step-end infinite;
+      }
+
+      @keyframes cursor-blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+      }
+
+      /* Smart Highlight Animation */
+      .smart-highlight {
+        position: relative;
+        display: inline-block;
+        z-index: 1;
+      }
+      .smart-highlight::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 0%;
+        background-color: #fde047; /* Yellow-300 */
+        z-index: -1;
+        opacity: 0.6;
+        animation: highlight 0.6s ease-out 0.2s forwards;
+        border-radius: 4px;
+      }
+
+      /* 
+         CRITICAL FIX FOR BLURRY TEXT 
+         1. Removed 'transform: translateZ(0)' which causes bitmap caching/blurring on scale.
+         2. Added explicit font smoothing.
+      */
+      .gpu-accelerated {
+        backface-visibility: hidden;
+        -webkit-font-smoothing: subpixel-antialiased;
+        -moz-osx-font-smoothing: auto;
+        /* Do NOT add will-change: transform here globally */
+      }
+      
+      /* Only use this for the specific element being dragged */
+      .force-gpu {
+        will-change: transform;
+        cursor: grabbing !important;
+      }
+
+      /* React PDF Text Layer - Essential for proper overlap with canvas */
+      .react-pdf__Page__textContent {
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform-origin: 0 0;
+        line-height: 1;
+      }
+      .react-pdf__Page__textContent span {
+        color: transparent;
+        position: absolute;
+        white-space: pre;
+        cursor: text;
+        transform-origin: 0% 0%;
+      }
+      .react-pdf__Page__annotations {
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform-origin: 0 0;
+        pointer-events: none;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
+    "d3": "https://esm.sh/d3@^7.9.0",
+    "lucide-react": "https://esm.sh/lucide-react@0.263.1?external=react,react-dom",
+    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
+    "framer-motion": "https://esm.sh/framer-motion@11.0.8?external=react,react-dom"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="overflow-hidden fixed w-full h-full transition-colors duration-500">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

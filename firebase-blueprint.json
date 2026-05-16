@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and subscription data",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "plan": {
+          "type": "string",
+          "enum": ["Free", "Basic", "Platform", "Professional", "Architect"],
+          "description": "The user's current subscription plan"
+        },
+        "customApiKey": {
+          "type": "string",
+          "description": "User's custom Gemini API key for Platform plan"
+        },
+        "openaiApiKey": {
+          "type": "string",
+          "description": "User's custom OpenAI API key for Platform plan"
+        },
+        "anthropicApiKey": {
+          "type": "string",
+          "description": "User's custom Anthropic API key for Platform plan"
+        },
+        "usageCount": {
+          "type": "number",
+          "description": "Number of features used in the current billing cycle"
+        },
+        "logicGuardUsageCount": {
+          "type": "number",
+          "description": "Number of Logic Guard uses in the current billing cycle"
+        },
+        "lastUsageReset": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last usage count reset"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "billingDueDate": {
+          "type": "number",
+          "description": "Timestamp for the next billing due date"
+        }
+      },
+      "required": ["uid", "email", "plan", "usageCount", "logicGuardUsageCount", "lastUsageReset", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Stores user profiles and subscription details"
+    },
+    "/users/{userId}/appData/{docId}": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string"
+          },
+          "chunks": {
+            "type": "number"
+          }
+        }
+      },
+      "description": "Stores user app data like inbox, library, canvases, etc."
+    }
+  }
+}
