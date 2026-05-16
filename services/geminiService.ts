@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { YoutubeTranscript } from 'youtube-transcript';
 import { InboxItem, Note, ProcessingOptions, Platform, QuizQuestion, CanvasNode, RetentionSummary, CanvasEdge } from "../types";
 
@@ -40,47 +40,46 @@ export const getModel = (_feature: 'LogicGuard' | 'General' = 'General') => {
     return 'gemini-2.0-flash';
 };
 
-// Unified REST interface simulating GoogleGenAI
+// Unified REST interface simulating the new GoogleGenAI (v1.x) interface
 class UnifiedAIClient {
     apiKey: string;
     provider: string;
     
-    constructor(provider: string, apiKey: string) {
-        this.provider = provider;
-        this.apiKey = apiKey;
+    constructor(config: { apiKey: string, provider?: string }) {
+        this.apiKey = config.apiKey;
+        this.provider = config.provider || 'gemini';
     }
 
     private convertContents(contents: any): any[] {
-        let messages = [];
-        let systemPrompt = "";
+        let messages: any[] = [];
+        const rawContents = Array.isArray(contents) ? contents : [contents];
 
-        if (typeof contents === 'string') {
-            messages.push({ role: 'user', content: contents });
-        } else if (Array.isArray(contents)) {
-             // Chat format: [{ role: 'user', parts: [{text: ""}] }]
-             for (const item of contents) {
-                 let combinedText = item.parts?.map((p:any) => p.text || '').join('\n') || '';
-                 messages.push({ role: item.role === 'model' ? 'assistant' : 'user', content: combinedText });
-             }
-        } else if (contents.parts) {
-             let combinedText = contents.parts.map((p:any) => p.text || '').join('\n');
-             messages.push({ role: 'user', content: combinedText });
+        for (const item of rawContents) {
+            if (typeof item === 'string') {
+                messages.push({ role: 'user', content: item });
+                continue;
+            }
+            
+            let combinedText = '';
+            const parts = item.parts || [];
+            if (typeof parts === 'string') {
+                combinedText = parts;
+            } else if (Array.isArray(parts)) {
+                combinedText = parts.map((p: any) => p.text || '').join('\n');
+            }
+            messages.push({ role: item.role === 'model' ? 'assistant' : 'user', content: combinedText });
         }
         return messages;
     }
 
     models = {
-        generateContent: async (params: any) => {
-            if (this.provider === 'gemini') {
-                const client = new GoogleGenAI({ apiKey: this.apiKey });
-                return client.models.generateContent(params);
-            }
-
+        generateContent: async (params: any): Promise<any> => {
             const messages = this.convertContents(params.contents);
-            const isJson = params.config?.responseMimeType === 'application/json';
+            const isJson = params.config?.responseMimeType === 'application/json' || params.generationConfig?.responseMimeType === 'application/json';
 
+            const endpoint = this.provider === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://integrate.api.nvidia.com/v1/chat/completions';
+            
             if (this.provider === 'openai' || this.provider === 'nvidia') {
-                const endpoint = this.provider === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://integrate.api.nvidia.com/v1/chat/completions';
                 const body: any = {
                     model: params.model || getModel(),
                     messages: messages,
@@ -101,14 +100,15 @@ class UnifiedAIClient {
                 if (!res.ok) throw new Error(`API Error: ${res.statusText}`);
                 const data = await res.json();
                 const text = data.choices[0]?.message?.content || "";
-                return { text };
+                
+                return {
+                    response: {
+                        text: () => text,
+                    }
+                };
             }
 
             if (this.provider === 'anthropic') {
-                let systemPrompt = "You are a helpful assistant.";
-                let anthropicMessages = messages;
-                
-                // Anthropic doesn't support forcing JSON via API type, just rely on prompt
                 const res = await fetch('https://api.anthropic.com/v1/messages', {
                     method: 'POST',
                     headers: {
@@ -119,39 +119,54 @@ class UnifiedAIClient {
                     },
                     body: JSON.stringify({
                         model: params.model || getModel(),
-                        messages: anthropicMessages,
+                        messages: messages,
                         max_tokens: 4096,
-                        system: systemPrompt
                     })
                 });
                 if (!res.ok) throw new Error(`Anthropic Error: ${res.statusText}`);
                 const data = await res.json();
-                return { text: data.content[0]?.text || "" };
+                const text = data.content[0]?.text || "";
+                return {
+                    response: {
+                        text: () => text,
+                    }
+                };
             }
-            return { text: "" };
+            return { response: { text: () => "" } };
         },
 
-        generateContentStream: async function* (params: any) {
-            if (this.provider === 'gemini') {
-                const client = new GoogleGenAI({ apiKey: this.apiKey });
-                yield* client.models.generateContentStream(params);
-                return;
-            }
-
-            // Fallback for non-gemini: just call generateContent and yield it as one chunk
-            const res = await this.generateContent(params);
-            yield {
-                candidates: [{
-                    content: {
-                        parts: [{ text: res.text }]
-                    }
-                }]
+        generateContentStream: async (params: any): Promise<any> => {
+            const self = this;
+            const res = await (this as any).generateContent(params);
+            const text = res.response.text();
+            
+            return {
+                stream: (async function* () {
+                    yield {
+                        text: () => text,
+                    };
+                })()
             };
         }
+    };
+
+    getGenerativeModel(params: any): any {
+        return {
+            generateContent: (p: any) => this.models.generateContent({ ...p, model: params.model }),
+            generateContentStream: (p: any) => this.models.generateContentStream({ ...p, model: params.model })
+        };
     }
 }
 
-export const getAI = () => {
+interface UnifiedAI {
+    models: {
+        generateContent: (params: any) => Promise<any>;
+        generateContentStream: (params: any) => Promise<any>;
+    };
+    getGenerativeModel: (params: any) => any;
+}
+
+export const getAI = (): UnifiedAI => {
     let keyToUse = '';
     
     // Load local config on the fly in case it was updated
@@ -166,10 +181,10 @@ export const getAI = () => {
     }
 
     if (localProvider === 'gemini') {
-        return new GoogleGenAI({ apiKey: keyToUse });
+        return new GoogleGenAI({ apiKey: keyToUse }) as any;
     }
 
-    return new UnifiedAIClient(localProvider, keyToUse);
+    return new UnifiedAIClient({ provider: localProvider, apiKey: keyToUse }) as any;
 };
 
 export const getImageAI = () => {
@@ -177,7 +192,7 @@ export const getImageAI = () => {
     if (!keyToUse) {
         throw new Error("Please enter your Image API key or Gemini API key in your Profile to use image features.");
     }
-    return new GoogleGenAI({ apiKey: keyToUse });
+    return new GoogleGenAI({ apiKey: keyToUse }) as any;
 };
 
 /**
@@ -271,14 +286,13 @@ export const analyzeFallacy = async (text: string) => {
       // HACKATHON NOTE: Using Gemini 3.1 Pro with Thinking Budget for deeper logical reasoning
       const result = await getAI().models.generateContent({
           model: getModel('LogicGuard'),
-          contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-          config: { 
-              responseMimeType: 'application/json',
-              thinkingConfig: { thinkingBudget: 2048 } 
+          contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+          generationConfig: { 
+              responseMimeType: 'application/json'
           }
       });
       
-      const responseText = result.text || "{}";
+      const responseText = result.response.text() || "{}";
       const parsed = safeJsonParse(responseText, "analyzeFallacy");
 
       // Validate Structure - If JSON parse succeeded and has structure, return it
@@ -353,16 +367,17 @@ export const transcribeHandwriting = async (base64Data: string, mimeType: string
     `;
 
     try {
-        const response = await callWithRetry<GenerateContentResponse>(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: 'gemini-2.0-flash', 
-            contents: {
+            contents: [{
+                role: 'user',
                 parts: [
                     { inlineData: { mimeType, data: base64Data } },
                     { text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }
                 ]
-            }
+            }]
         }));
-        const text = response.text || "";
+        const text = result.response.text() || "";
         return text.split('\n').filter(s => s.trim() !== '');
     } catch (e) {
         console.error("Transcription failed", e);
@@ -420,19 +435,18 @@ export const analyzeMemoryRetention = async (library: Note[], onProgress?: (thin
     }`;
 
     try {
-        const responseStream = await callWithRetry(() => getAI().models.generateContentStream({
-            model: getModel('General'), // Use pro for better reasoning and thinking
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+        const result = await callWithRetry(() => getAI().models.generateContentStream({
+            model: getModel('General'),
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
         
         let fullText = "";
         let fullThinking = "";
         
-        for await (const chunk of responseStream) {
-            const c = chunk as any;
-            const textPart = c.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || "";
-            const thoughtPart = c.candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought || "";
+        for await (const chunk of result.stream) {
+            const textPart = chunk.text() || "";
+            const thoughtPart = (chunk as any).thought || "";
             
             if (thoughtPart) {
                 fullThinking += thoughtPart;
@@ -512,12 +526,12 @@ export const regenerateQuiz = async (summary: string[]): Promise<QuizQuestion[]>
     Format: JSON Array of objects: { "question": "...", "options": ["A", "B", "C", "D"], "correctAnswerIndex": number }`;
     
     try {
-        const response: GenerateContentResponse = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel('General'),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        const data = safeJsonParse(response.text || "[]", "regenerateQuiz");
+        const data = safeJsonParse(result.response.text() || "[]", "regenerateQuiz");
         return Array.isArray(data) ? data : [];
     } catch (e) { return []; }
 };
@@ -693,14 +707,10 @@ export const processUrlContent = async (
         // Determine if we need Search Grounding
         const useGrounding = !(isFile || platform === Platform.FILE || platform === Platform.YOUTUBE);
         
-        const responseStream = await callWithRetry(() => getAI().models.generateContentStream({
+        const result = await callWithRetry(() => getAI().models.generateContentStream({
             model: getModel('General'),
-            contents: { parts },
-            config: {
-                // Ensure tools are active for URL mode
-                tools: useGrounding ? [{ urlContext: {} }] : [],
-                // FIX: Do not enforce JSON MIME type when using Search Grounding to avoid conflicts
-                // If using grounding, we rely on the prompt to get JSON. If local file, we enforce it.
+            contents: [{ role: 'user', parts: parts }],
+            generationConfig: {
                 responseMimeType: useGrounding ? undefined : 'application/json',
             }
         }));
@@ -708,10 +718,9 @@ export const processUrlContent = async (
         let fullText = "";
         let fullThinking = "";
         
-        for await (const chunk of responseStream) {
-            const c = chunk as any;
-            const textPart = c.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || "";
-            const thoughtPart = c.candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought || "";
+        for await (const chunk of result.stream) {
+            const textPart = chunk.text() || "";
+            const thoughtPart = (chunk as any).thought || "";
             
             if (thoughtPart) {
                 fullThinking += thoughtPart;
@@ -766,12 +775,12 @@ export const generateQuizFromUserContent = async (thoughts: string, files: strin
     Format: JSON Array of objects: { "question": "...", "options": ["A", "B", "C", "D"], "correctAnswerIndex": number }`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        const data = safeJsonParse(response.text || "[]", "generateQuizFromUserContent");
+        const data = safeJsonParse(result.response.text() || "[]", "generateQuizFromUserContent");
         return Array.isArray(data) ? data : [];
     } catch (e) { return []; }
 };
@@ -817,19 +826,18 @@ export const processNeuralDump = async (transcript: string, contextItems?: any[]
     `;
 
     try {
-        const responseStream = await callWithRetry(() => getAI().models.generateContentStream({
+        const result = await callWithRetry(() => getAI().models.generateContentStream({
             model: getModel('General'),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
         
         let fullText = "";
         let fullThinking = "";
         
-        for await (const chunk of responseStream) {
-            const c = chunk as any;
-            const textPart = c.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || "";
-            const thoughtPart = c.candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought || "";
+        for await (const chunk of result.stream) {
+            const textPart = chunk.text() || "";
+            const thoughtPart = (chunk as any).thought || "";
             
             if (thoughtPart) {
                 fullThinking += thoughtPart;
@@ -917,7 +925,7 @@ export const chatWithKo = async (
             }
         }
 
-        const stream = await getAI().models.generateContentStream({
+        const result = await getAI().models.generateContentStream({
             model: getModel(socraticMode ? 'LogicGuard' : 'General'),
             contents: [
                 { role: 'user', parts: parts }
@@ -927,10 +935,9 @@ export const chatWithKo = async (
         let fullText = "";
         let fullThinking = "";
         
-        for await (const chunk of stream) {
-            const c = chunk as any;
-            const textPart = c.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text || "";
-            const thoughtPart = c.candidates?.[0]?.content?.parts?.find((p: any) => p.thought)?.thought || "";
+        for await (const chunk of result.stream) {
+            const textPart = chunk.text() || "";
+            const thoughtPart = (chunk as any).thought || "";
             
             if (thoughtPart) {
                 fullThinking += thoughtPart;
@@ -961,12 +968,12 @@ export const runArchitect = async (nodes: CanvasNode[]): Promise<{ clusters: { i
     { "clusters": [ { "id": "cluster-1", "title": "Cluster Name", "nodeIds": ["node-id-1", "node-id-2"] } ] }`;
 
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        const data = safeJsonParse(response.text || "{}", "runArchitect");
+        const data = safeJsonParse(result.response.text() || "{}", "runArchitect");
         return data.clusters ? data : { clusters: [] };
     } catch (e) { return { clusters: [] }; }
 };
@@ -978,12 +985,12 @@ export const detectFallacies = async (text: string): Promise<string[]> => {
     Format: JSON Array of strings.`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        const data = safeJsonParse(response.text || "[]", "detectFallacies");
+        const data = safeJsonParse(result.response.text() || "[]", "detectFallacies");
         return Array.isArray(data) ? data : [];
     } catch (e) { return []; }
 };
@@ -997,12 +1004,12 @@ export const checkContradictions = async (nodeA: CanvasNode, nodeB: CanvasNode):
     Format: JSON { "contradiction": "explanation" | null }`;
 
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        const data = safeJsonParse(response.text || "{}", "checkContradictions");
+        const data = safeJsonParse(result.response.text() || "{}", "checkContradictions");
         return data.contradiction || null;
     } catch (e) { return null; }
 };
@@ -1017,12 +1024,12 @@ export const findSparkConnections = async (nodes: CanvasNode[]): Promise<CanvasE
     [ { "id": "edge-id", "source": "node-id-1", "target": "node-id-2", "type": "neural" } ]`;
 
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        const data = safeJsonParse(response.text || "[]", "findSparkConnections");
+        const data = safeJsonParse(result.response.text() || "[]", "findSparkConnections");
         return Array.isArray(data) ? data : [];
     } catch (e) { return []; }
 };
@@ -1037,12 +1044,12 @@ export const synthesizeNodes = async (items: any[], mode: string): Promise<{titl
     { "title": "Synthesized Title", "content": "The synthesized content...", "steps": ["Step 1", "Step 2"], "imageUrl": "Optional DALL-E style prompt for a visual" }`;
 
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        const data = safeJsonParse(response.text || "{}", "synthesizeNodes");
+        const data = safeJsonParse(result.response.text() || "{}", "synthesizeNodes");
         return {
             title: data.title || "Synthesized Asset",
             content: data.content || "Synthesis output...",
@@ -1060,11 +1067,11 @@ export const summarizeSources = async (sources: any[]): Promise<string> => {
     SOURCES: ${context}`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }]
         }));
-        return response.text || "Summary unavailable.";
+        return result.response.text() || "Summary unavailable.";
     } catch (e) { return "Summary failed."; }
 };
 
@@ -1078,12 +1085,12 @@ export const extractKeywordsForGrouping = async (nodes: CanvasNode[]): Promise<{
     Output format: [{"nodeId": "...", "keywords": ["Theme Name"]}]`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        const parsed = safeJsonParse(response.text || "[]", "extractKeywordsForGrouping");
+        const parsed = safeJsonParse(result.response.text() || "[]", "extractKeywordsForGrouping");
         
         const extractKeywords = (p: any): string[] => {
             if (Array.isArray(p.keywords)) return p.keywords;
@@ -1143,11 +1150,11 @@ export const runNightShift = async (nodes: CanvasNode[]): Promise<string> => {
     Provide one high-level insight or connection that emerges from this collection.`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }]
         }));
-        return response.text || "Night shift complete.";
+        return result.response.text() || "Night shift complete.";
     } catch (e) { return "Night shift failed."; }
 };
 
@@ -1159,11 +1166,11 @@ export const analyzeBoardContext = async (items: any[]) => {
     Provide a brief (2 sentence) overview of the main themes present.`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }]
         }));
-        return response.text || "Analysis complete.";
+        return result.response.text() || "Analysis complete.";
     } catch (e) { return "Analysis failed."; }
 };
 
@@ -1174,12 +1181,12 @@ export const generateCourseOutline = async (noteNodes: any[]) => {
     Format: JSON { "title": "Course Name", "weeks": [ { "week": 1, "topic": "...", "description": "..." } ] }`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        return safeJsonParse(response.text || "{}", "generateCourseOutline");
+        return safeJsonParse(result.response.text() || "{}", "generateCourseOutline");
     } catch (e) { return null; }
 };
 
@@ -1188,12 +1195,12 @@ export const generateActionPlan = async (insight: string) => {
     Format: JSON { "title": "Action Plan", "steps": ["...", "...", "..."] }`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        const data = safeJsonParse(response.text || "{}", "generateActionPlan");
+        const data = safeJsonParse(result.response.text() || "{}", "generateActionPlan");
         return { title: data.title || "Plan", content: data.steps?.join('\n') || "..." };
     } catch (e) { return { title: "Plan", content: "..." }; }
 };
@@ -1206,12 +1213,12 @@ export const generateSkillTree = async (noteNodes: any[], mode: string) => {
     Format: JSON Array of objects: { "skill": "...", "prerequisites": ["..."] }`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        const data = safeJsonParse(response.text || "[]", "generateSkillTree");
+        const data = safeJsonParse(result.response.text() || "[]", "generateSkillTree");
         return Array.isArray(data) ? data : [];
     } catch (e) { return []; }
 };
@@ -1224,12 +1231,12 @@ export const runAgentCheck = async (library: Note[]) => {
     Format: JSON { "recommendation": "...", "reason": "..." }`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        return safeJsonParse(response.text || "{}", "runAgentCheck");
+        return safeJsonParse(result.response.text() || "{}", "runAgentCheck");
     } catch (e) { return null; }
 };
 
@@ -1239,12 +1246,12 @@ export const checkPostCaptureTriggers = async (item: InboxItem, library: Note[])
     Format: JSON { "trigger": "connection" | "conflict" | null, "reason": "..." }`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        return safeJsonParse(response.text || "{}", "checkPostCaptureTriggers");
+        return safeJsonParse(result.response.text() || "{}", "checkPostCaptureTriggers");
     } catch (e) { return null; }
 };
 
@@ -1254,12 +1261,12 @@ export const generateThreeCCanvas = async (targets: Note[]) => {
     Format: JSON { "title": "3C Analysis", "concept": "...", "conflict": "...", "conclusion": "..." }`;
     
     try {
-        const response = await callWithRetry(() => getAI().models.generateContent({
+        const result = await callWithRetry(() => getAI().models.generateContent({
             model: getModel(),
-            contents: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.`,
-            config: { responseMimeType: "application/json" }
+            contents: [{ role: 'user', parts: [{ text: prompt + `\n\nRespond entirely in ${getSystemLanguage()}.` }] }],
+            generationConfig: { responseMimeType: "application/json" }
         }));
-        const data = safeJsonParse(response.text || "{}", "generateThreeCCanvas");
+        const data = safeJsonParse(result.response.text() || "{}", "generateThreeCCanvas");
         return { 
             id: `canvas-${Date.now()}`, 
             title: data.title || '3C Analysis', 

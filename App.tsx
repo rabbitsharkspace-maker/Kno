@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { InboxItem, Note, ViewState, AppTheme, ProcessingOptions, DailyActivity, QuizDifficulty, QuizFeedbackType, RetentionSummary, CanvasDocument, QuizAttempt, Platform, CanvasNode, SparkInsight, CanvasEdge, Folder, Theme, CanvasGroup, UserProfile } from './types';
 import { Library } from './components/Library';
 import { LearningCanvas } from './components/LearningCanvas';
@@ -10,7 +10,7 @@ import { processUrlContent, detectPlatform, setCustomApiKey, setOpenaiApiKey } f
 import { saveToStorage, loadAllFromStorage } from './services/storage';
 import { THEME_CLASSES } from './constants';
 import { useNeuralDump } from './hooks/useNeuralDump';
-import { X, Crown, Shield } from 'lucide-react';
+import { X } from 'lucide-react';
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: any }> {
@@ -71,6 +71,7 @@ const DEFAULT_INBOX: InboxItem[] = [];
 const App: React.FC = () => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+
   const [showPricing, setShowPricing] = useState(false);
 
   const [view, setView] = useState<ViewState>('canvas');
