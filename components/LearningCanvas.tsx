@@ -2336,7 +2336,8 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
                  return next;
              });
         }
-        if (isReadOnly) return;
+        // Moving a card rearranges the view, it does not author anything, so
+        // read-only visitors get to drag. Editing, deleting and generating stay shut.
         setActiveDragNode(node.id);
         dragStartValues.current = { mouseX: e.clientX, mouseY: e.clientY, nodeX: node.x, nodeY: node.y };
         
