@@ -37,10 +37,13 @@ export const getModel = (_feature: 'LogicGuard' | 'General' = 'General') => {
     if (selectedProvider === 'openai') return 'gpt-4o';
     if (selectedProvider === 'anthropic') return 'claude-3-5-sonnet-20241022';
     if (selectedProvider === 'nvidia') return 'meta/llama-3.1-405b-instruct';
-    // An alias, not a pinned version. gemini-2.0-flash was hardcoded here and
-    // has since been retired, so every call came back 404 and read as a broken
-    // API key. The alias tracks whatever the current flash model is.
-    return 'gemini-flash-latest';
+    // Pinned rather than `gemini-flash-latest`: the alias points at whatever is
+    // newest, which is also whatever is busiest, and it answered 503 UNAVAILABLE
+    // under load. This one is mature and widely provisioned. The cost of pinning
+    // is that a retirement breaks it again — gemini-2.0-flash was hardcoded here
+    // until it was retired, and every call came back 404, which reads from the
+    // outside exactly like a rejected API key.
+    return 'gemini-2.5-flash';
 };
 
 // Unified REST interface simulating the new GoogleGenAI (v1.x) interface
@@ -371,7 +374,7 @@ export const transcribeHandwriting = async (base64Data: string, mimeType: string
 
     try {
         const result = await callWithRetry(() => getAI().models.generateContent({
-            model: 'gemini-flash-latest', 
+            model: 'gemini-2.5-flash', 
             contents: [{
                 role: 'user',
                 parts: [
