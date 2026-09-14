@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { getSubtitles } from 'youtube-captions-scraper';
+import { assertPublicUrl } from "./api/_safe-url";
 
 async function startServer() {
   const app = express();
@@ -69,9 +70,12 @@ async function startServer() {
       if (!url) {
         return res.status(400).json({ error: "URL is required" });
       }
+      // Checked before it is passed on, so this endpoint cannot be used to point
+      // a reader at an address that was never meant to be reachable from outside.
+      await assertPublicUrl(url);
 
       // Use Jina to extract markdown
-      const response = await fetch(`https://r.jina.ai/${url}`);
+      const response = await fetch(`https://r.jina.ai/${encodeURIComponent(url)}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch from Jina: ${response.statusText}`);
       }

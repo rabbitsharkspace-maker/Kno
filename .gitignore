@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Secrets. `.env.example` is the only one that belongs in the repo — everything
+# else here names live credentials, and `vite.config.ts` inlines GEMINI_API_KEY
+# straight into the client bundle, so a committed .env leaks twice over.
+.env
+.env.*
+!.env.example

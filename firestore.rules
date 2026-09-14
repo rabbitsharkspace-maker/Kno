@@ -2,6 +2,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ===============================================================
+    // NOT WIRED UP
+    //
+    // Kno ships with no Firebase dependency — there is no `initializeApp` in
+    // the app and nothing reads or writes these documents. This file is a
+    // design for a backend that was never connected, kept because the shape is
+    // still the intended one.
+    //
+    // The fields it used to carry for billing are gone: Kno is free, every
+    // reader brings their own key, and the keys never leave the browser. A rule
+    // set that validates a paid plan, on a product that does not charge, reads
+    // to anyone browsing this repo as a paywall with a hole in it.
+    //
+    // ===============================================================
     // Assumed Data Model
     // ===============================================================
     //
@@ -12,9 +25,6 @@ service cloud.firestore {
     //   - email: string (required, immutable)
     //   - displayName: string (optional)
     //   - plan: string (required, enum: ['Free', 'Basic', 'Professional', 'Architect'])
-    //   - usageCount: number (required)
-    //   - logicGuardUsageCount: number (required)
-    //   - lastUsageReset: number (required)
     //   - createdAt: number (required, immutable)
     //
     // ===============================================================
@@ -57,29 +67,15 @@ service cloud.firestore {
       // Allow displayName and language to be optional
       let hasValidDisplayName = !('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100);
       let hasValidLanguage = !('language' in data) || (data.language is string && data.language.size() <= 10);
-      let hasValidLogicGuardUsageCount = !('logicGuardUsageCount' in data) || (data.logicGuardUsageCount is number && data.logicGuardUsageCount >= 0);
-      let hasValidUsageCount = !('usageCount' in data) || (data.usageCount is number && data.usageCount >= 0);
-      let hasValidLastUsageReset = !('lastUsageReset' in data) || (data.lastUsageReset is number);
       let hasValidCreatedAt = !('createdAt' in data) || (data.createdAt is number);
-      let hasValidCustomApiKey = !('customApiKey' in data) || (data.customApiKey is string && data.customApiKey.size() <= 200);
-      let hasValidOpenaiApiKey = !('openaiApiKey' in data) || (data.openaiApiKey is string && data.openaiApiKey.size() <= 200);
-      let hasValidAnthropicApiKey = !('anthropicApiKey' in data) || (data.anthropicApiKey is string && data.anthropicApiKey.size() <= 200);
-      let hasValidBillingDueDate = !('billingDueDate' in data) || (data.billingDueDate is number);
       
       return hasRequiredFields(['uid', 'email', 'plan']) &&
-             hasOnlyAllowedFields(['uid', 'email', 'displayName', 'plan', 'usageCount', 'logicGuardUsageCount', 'lastUsageReset', 'createdAt', 'language', 'customApiKey', 'openaiApiKey', 'anthropicApiKey', 'billingDueDate']) &&
+             hasOnlyAllowedFields(['uid', 'email', 'displayName', 'plan', 'createdAt', 'language']) &&
              data.uid is string && data.uid.size() > 0 && data.uid.size() < 128 &&
              isValidEmail(data.email) &&
              hasValidDisplayName &&
              hasValidLanguage &&
-             hasValidLogicGuardUsageCount &&
-             hasValidUsageCount &&
-             hasValidLastUsageReset &&
              hasValidCreatedAt &&
-             hasValidCustomApiKey &&
-             hasValidOpenaiApiKey &&
-             hasValidAnthropicApiKey &&
-             hasValidBillingDueDate &&
              data.plan in ['Free', 'Basic', 'Platform', 'Professional', 'Architect'];
     }
 
@@ -91,10 +87,7 @@ service cloud.firestore {
       // Users can create their own profile
       allow create: if isOwner(userId) && 
                        isValidUser(request.resource.data) && 
-                       uidUnchanged() &&
-                       (!('usageCount' in request.resource.data) || request.resource.data.usageCount == 0) &&
-                       (!('logicGuardUsageCount' in request.resource.data) || request.resource.data.logicGuardUsageCount == 0);
-                       
+                       uidUnchanged();
       // Users can read their own profile
       allow read: if isOwner(userId);
       
