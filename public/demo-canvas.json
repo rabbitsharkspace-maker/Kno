@@ -135,25 +135,20 @@
             "source": "n-ticketing",
             "target": "n-collider",
             "type": "synthesis",
-            "lineStyle": "solid"
+            "lineStyle": "solid",
+            "color": "#A855F7"
           },
           {
             "id": "e-4",
             "source": "n-fastresume",
             "target": "n-collider",
             "type": "synthesis",
-            "lineStyle": "solid"
+            "lineStyle": "solid",
+            "color": "#A855F7"
           },
           {
             "id": "e-5",
             "source": "n-sunrise",
-            "target": "n-spark",
-            "type": "spark",
-            "lineStyle": "dashed"
-          },
-          {
-            "id": "e-6",
-            "source": "n-ticketing",
             "target": "n-spark",
             "type": "spark",
             "lineStyle": "dashed"
