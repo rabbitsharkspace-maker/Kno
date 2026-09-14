@@ -796,6 +796,23 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
         if (saved) setViewport(saved);
     }, [activeCanvas?.id]);
     const [localNodes, setLocalNodes] = useState<CanvasNode[]>([]);
+    /*
+     * A read-only canvas opens its audits.
+     *
+     * Normally a critique is hidden until Logic Guard is pressed, because the
+     * person pressing it just asked for it. A visitor to the demo has asked for
+     * nothing and does not know the tool exists — so the one card that failed
+     * an audit arrived looking like the four that passed. Opened once per
+     * canvas, so closing one stays closed.
+     */
+    const openedAuditsFor = useRef<string | null>(null);
+    useEffect(() => {
+        if (!isReadOnly || !activeCanvasId || openedAuditsFor.current === activeCanvasId) return;
+        const audited = localNodes.filter(n => n.critique).map(n => n.id);
+        if (!audited.length) return;
+        openedAuditsFor.current = activeCanvasId;
+        setExpandedCritiques(prev => ({ ...prev, ...Object.fromEntries(audited.map(id => [id, true])) }));
+    }, [isReadOnly, activeCanvasId, localNodes]);
     const [localEdges, setLocalEdges] = useState<CanvasEdge[]>([]);
     const [localGroups, setLocalGroups] = useState<CanvasGroup[]>([]);
     const [drawingEdge, setDrawingEdge] = useState<{ sourceId: string, startX: number, startY: number, currentX: number, currentY: number } | null>(null);
