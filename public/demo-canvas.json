@@ -1,6 +1,173 @@
 {
-  "_note": "Placeholder. Replace with a real export: open Kno, build the canvas, run Alchemy, then export kno_canvases / kno_library from IndexedDB into this shape.",
-  "canvases": [],
+  "canvases": [
+    {
+      "id": "canvas-rabbitshark-demo",
+      "title": "RabbitShark Studio",
+      "lastModified": 1789369372528,
+      "thumbnailNodes": 7,
+      "state": {
+        "nodes": [
+          {
+            "id": "n-serene",
+            "type": "note",
+            "source": "manual",
+            "title": "Serene",
+            "content": "In a country you don't know, what you lose isn't the language. It's knowing what to do next. A notice arrives that you can't read, it asks something of you, and there are consequences if you don't.\n\nPhotograph it — reading and verification happen in one call, through Gemini's Search Grounding, and every citation opens to its source. Whether an appeal succeeds is the authority's decision; this only makes sure you know the option exists.\n\nI have had that phone call myself. More than once.",
+            "x": 40,
+            "y": 40,
+            "width": 300
+          },
+          {
+            "id": "n-ticketing",
+            "type": "note",
+            "source": "manual",
+            "title": "Community Ticketing",
+            "content": "100+ maintenance requests a day, classified, prioritised and assigned automatically. Response goes from hours to seconds. For a residential community drowning in manual entry.\n\nReading an image or checking a source goes to Gemini. Plain text goes to Gemma. Offline falls back to Gemini Nano on the phone. Around eight in ten requests take the cheaper path.",
+            "x": 355,
+            "y": 40,
+            "width": 300,
+            "critique": {
+              "issue": "Two performance claims are stated without evidence, and the write-up only shows the upside.",
+              "fix": "Publish the measurement window and sample size behind both numbers, and name the failure modes of the cheaper path.",
+              "confidence": "High",
+              "isSafe": false,
+              "structuredAnalysis": {
+                "factual": {
+                  "status": "Unverified Claim",
+                  "issue": "Claims regarding 'response goes from hours to seconds' and the 'eight in ten requests take the cheaper path' distribution lack empirical verification and context-specific testing."
+                },
+                "balance": {
+                  "status": "Skewed",
+                  "check": "Highlights cost savings and latency reduction while omitting potential failure modes, false classifications, and edge-device hardware constraints for offline execution."
+                },
+                "logic": {
+                  "status": "Sound",
+                  "type": "Solid",
+                  "explanation": "The cascading architecture model routing simpler text tasks to lighter models and complex multimodal tasks to larger cloud models is functionally coherent and follows valid tiered routing principles."
+                }
+              }
+            }
+          },
+          {
+            "id": "n-sunrise",
+            "type": "note",
+            "source": "manual",
+            "title": "Sunrise Care",
+            "content": "Handover notes at shift change, vitals logged twice — once on paper, once in the system, incident reports written from memory at the end of a ten-hour round.\n\nHands the paperwork, monitoring and repetition to AI so carers can spend their time on people.\n\nBuilt by a caregiver, for the round she works.",
+            "x": 670,
+            "y": 40,
+            "width": 300
+          },
+          {
+            "id": "n-fastresume",
+            "type": "note",
+            "source": "manual",
+            "title": "FastResume",
+            "content": "One career, rewritten for every ATS keyword filter, every market's résumé conventions, every language — and no way to see what the parser actually extracted before a human ever reads it.",
+            "x": 985,
+            "y": 40,
+            "width": 300
+          },
+          {
+            "id": "n-alchemy",
+            "type": "asset",
+            "source": "alchemy",
+            "title": "The Architecture of Disorientation",
+            "content": "In the uncharted landscapes of a foreign country, the primary loss isn't the lexicon, but the fundamental instinct of what comes next when an unreadable notice lands. This profound disorientation finds its echo in the friction of critical systems: handover notes at shift change, vitals logged redundantly across paper and digital, and crucial incident reports painstakingly reconstructed from memory at the close of an arduous ten-hour shift. Both scenarios illuminate a core vulnerability: where information flow is fractured, whether by linguistic barriers or inefficient processes, the compass of certainty spins wildly, leading to systemic strain and a profound loss of direction.",
+            "x": 60,
+            "y": 400,
+            "width": 340,
+            "synthesisHistory": [
+              {
+                "title": "The Architecture of Disorientation",
+                "content": "In the uncharted landscapes of a foreign country, the primary loss isn't the lexicon, but the fundamental instinct of what comes next when an unreadable notice lands. This profound disorientation finds its echo in the friction of critical systems: handover notes at shift change, vitals logged redundantly across paper and digital, and crucial incident reports painstakingly reconstructed from memory at the close of an arduous ten-hour shift. Both scenarios illuminate a core vulnerability: where information flow is fractured, whether by linguistic barriers or inefficient processes, the compass of certainty spins wildly, leading to systemic strain and a profound loss of direction.",
+                "timestamp": 1789369372528
+              }
+            ],
+            "historyIndex": 0
+          },
+          {
+            "id": "n-collider",
+            "type": "synthesis",
+            "source": "collider",
+            "title": "Verified Contribution-to-Credential Pipeline",
+            "content": "Merging community ticketing with rapid resume generation creates a dynamic proof-of-work career profile. Instead of relying on static self-reported achievements, each resolved support ticket, community task, or peer-validated contribution instantly generates verified, metric-driven resume entries, allowing talent to showcase continuous, real-world impact in real time.",
+            "x": 470,
+            "y": 400,
+            "width": 340,
+            "synthesisHistory": [
+              {
+                "title": "Verified Contribution-to-Credential Pipeline",
+                "content": "Merging community ticketing with rapid resume generation creates a dynamic proof-of-work career profile. Instead of relying on static self-reported achievements, each resolved support ticket, community task, or peer-validated contribution instantly generates verified, metric-driven resume entries, allowing talent to showcase continuous, real-world impact in real time.",
+                "timestamp": 1789369372528
+              }
+            ],
+            "historyIndex": 0
+          },
+          {
+            "id": "n-spark",
+            "type": "spark",
+            "source": "insight",
+            "title": "The Unseen Ticketing System of Care",
+            "content": "Connected to: \"Community Ticketing\"\n\nDespite their vastly different contexts, 'Sunrise Care' and 'Community Ticketing' reveal a shared struggle: managing distributed, time-sensitive tasks and information. 'Sunrise Care' implicitly operates as an inefficient, manual ticketing system—where shift handovers are 'ticket transfers,' vitals logged twice signify redundant 'updates,' and incident reports from memory are delayed 'bug reports.' The structured, centralized, and real-time methodology of 'Community Ticketing' offers a surprising blueprint to transform these inherent inefficiencies in care delivery into a transparent, accountable, and proactive system, minimizing errors and improving patient outcomes by formalizing the 'tickets' of care.",
+            "x": 880,
+            "y": 400,
+            "width": 340
+          }
+        ],
+        "edges": [
+          {
+            "id": "e-1",
+            "source": "n-serene",
+            "target": "n-alchemy",
+            "type": "synthesis",
+            "lineStyle": "solid"
+          },
+          {
+            "id": "e-2",
+            "source": "n-sunrise",
+            "target": "n-alchemy",
+            "type": "synthesis",
+            "lineStyle": "solid"
+          },
+          {
+            "id": "e-3",
+            "source": "n-ticketing",
+            "target": "n-collider",
+            "type": "synthesis",
+            "lineStyle": "solid"
+          },
+          {
+            "id": "e-4",
+            "source": "n-fastresume",
+            "target": "n-collider",
+            "type": "synthesis",
+            "lineStyle": "solid"
+          },
+          {
+            "id": "e-5",
+            "source": "n-sunrise",
+            "target": "n-spark",
+            "type": "spark",
+            "lineStyle": "dashed"
+          },
+          {
+            "id": "e-6",
+            "source": "n-ticketing",
+            "target": "n-spark",
+            "type": "spark",
+            "lineStyle": "dashed"
+          }
+        ],
+        "groups": [],
+        "viewport": {
+          "x": 0,
+          "y": 0,
+          "zoom": 1
+        }
+      }
+    }
+  ],
   "library": [],
   "folders": [],
   "themes": []

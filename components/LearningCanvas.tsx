@@ -10,7 +10,7 @@ import { GoogleGenAI } from "@google/genai";
 import { ReasoningTrace } from './ReasoningTrace';
 import { KoLogo } from './Logos';
 import { 
-    InboxItem, Note, ProcessingOptions, AppTheme, CanvasDocument, CanvasNode, CanvasEdge, 
+    InboxItem, Note, ProcessingOptions, AppTheme, CanvasDocument, CanvasNode, CanvasEdge, NodeSource, 
     FileData, CritiqueResult, Platform, CanvasState, Folder, CanvasGroup, NodeType, Theme
 } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -2773,18 +2773,26 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
     };
 
     const handleLogicScan = async () => {
-        if (isReadOnly) return;
-        if (!canUsePremiumFeatures('LogicGuard')) return;
+        if (isReadOnly && selectedNodeIds.size !== 1) {
+            const audited = localNodes.find(n => n.critique);
+            if (audited) setSelectedNodeIds(new Set([audited.id]));
+            if (audited) setExpandedCritiques(prev => ({ ...prev, [audited.id]: true }));
+            return;
+        }
         if (selectedNodeIds.size !== 1) return;
         const selection = Array.from(selectedNodeIds);
         const id = selection[0] as string; 
         const node = localNodes.find(n => n.id === id);
         if (!node) return;
+        // An audit that already exists is just shown or hidden — nothing is generated,
+        // so read-only visitors get to open it too.
         if (node.critique) {
             const currentVisibility = expandedCritiques[id];
             setExpandedCritiques(prev => ({ ...prev, [id]: !currentVisibility }));
             return;
         }
+        if (isReadOnly) return;
+        if (!canUsePremiumFeatures('LogicGuard')) return;
         setScanningNodeId(id); 
         try {
             const rawContent = node.content || node.title || "";
@@ -2820,8 +2828,21 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
         if (onAddNote) onAddNote(newNote);
     };
 
+    // Read-only demo: every result is already on the canvas, so a tool click
+    // brings its card to the middle of the screen instead of generating a new one.
+    const revealPrebaked = (source: NodeSource) => {
+        const node = localNodes.find(n => n.source === source);
+        if (!node) return;
+        setSelectedNodeIds(new Set([node.id]));
+        setViewport(prev => ({
+            ...prev,
+            x: window.innerWidth / 2 - (node.x + (node.width || 320) / 2) * prev.zoom,
+            y: window.innerHeight / 2 - (node.y + 140) * prev.zoom,
+        }));
+    };
+
     const handleSpark = async () => {
-        if (isReadOnly) return;
+        if (isReadOnly) return revealPrebaked('insight');
         if (!canUsePremiumFeatures('Spark')) return;
         if (selectedNodeIds.size !== 1) return;
         const selectedId = Array.from(selectedNodeIds)[0] as string;
@@ -2915,7 +2936,7 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
     };
 
     const handleCollider = async (nodesToCollide?: CanvasNode[]) => {
-        if (isReadOnly) return;
+        if (isReadOnly) return revealPrebaked('collider');
         if (!canUsePremiumFeatures('Collider')) return;
         const targetNodes = nodesToCollide || localNodes.filter(n => selectedNodeIds.has(n.id));
         if (targetNodes.length < 2) return; 
@@ -3004,6 +3025,7 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
     };
 
     const handleAlchemy = async () => {
+        if (isReadOnly) return revealPrebaked('alchemy');
         if (!canUsePremiumFeatures('Alchemy')) return;
         if (selectedNodeIds.size < 2) return; 
         const sourceNodes = localNodes.filter(n => selectedNodeIds.has(n.id));
@@ -3948,11 +3970,15 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
                                     <button onClick={handleAutoArrangeWithKeywords} onPointerDownCapture={(e) => e.stopPropagation()} disabled={isThinking} className={`px-4 py-2 text-xs font-bold rounded-xl whitespace-nowrap flex items-center ${isThinking ? 'text-gray-400 bg-gray-50 cursor-not-allowed' : 'text-indigo-600 hover:bg-indigo-50'}`}>{isThinking ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Hexagon className="w-4 h-4 mr-2" />} {isThinking ? 'Processing...' : 'Thematic Arrange'} {!canUsePremiumFeatures('ThematicArrange', true) && <Lock className="w-3 h-3 ml-2 text-gray-400" />}</button>
                                 </div>
                             </div>
+                        </>
+                    )}
                             <div className="w-px h-8 bg-gray-100 mx-1"></div>
-                            <ToolbarButton onClick={() => selectedEdgeIds.size > 0 ? handleEdgeAIAction('collider') : handleCollider()} icon={<Zap className="w-5 h-5 fill-current text-purple-500" />} title="Collider" description="Synthesize two conflicting ideas" disabled={selectedNodeIds.size < 2 && selectedEdgeIds.size === 0} className="hover:bg-purple-50" isLocked={!canUsePremiumFeatures('Collider', true)} />
-                            <ToolbarButton onClick={() => selectedEdgeIds.size > 0 ? handleEdgeAIAction('alchemy') : handleAlchemy()} icon={<FlaskConical className="w-5 h-5 text-emerald-500" />} title="Alchemy" description="Transform multiple notes into gold" disabled={selectedNodeIds.size < 2 && selectedEdgeIds.size === 0} className="hover:bg-green-50" isLocked={!canUsePremiumFeatures('Alchemy', true)} />
-                            <ToolbarButton onClick={() => selectedEdgeIds.size > 0 ? handleEdgeAIAction('spark') : handleSpark()} icon={<Sparkles className="w-5 h-5 fill-current text-yellow-500" />} title="Spark" description="Find serendipitous connections" disabled={selectedNodeIds.size !== 1 && selectedEdgeIds.size === 0} className="hover:bg-yellow-50" isLocked={!canUsePremiumFeatures('Spark', true)} />
-                            <ToolbarButton onClick={() => selectedEdgeIds.size > 0 ? handleEdgeAIAction('logic_guard') : handleLogicScan()} icon={<Shield className="w-5 h-5 text-red-500" />} title="Logic Guard" description="Scan for logical fallacies" disabled={selectedNodeIds.size !== 1 && selectedEdgeIds.size === 0} className="hover:bg-red-50" isLocked={!canUsePremiumFeatures('LogicGuard', true)} />
+                            <ToolbarButton onClick={() => selectedEdgeIds.size > 0 ? handleEdgeAIAction('collider') : handleCollider()} icon={<Zap className="w-5 h-5 fill-current text-purple-500" />} title="Collider" description="Synthesize two conflicting ideas" disabled={!isReadOnly && (selectedNodeIds.size < 2 && selectedEdgeIds.size === 0)} className="hover:bg-purple-50" isLocked={!isReadOnly && !canUsePremiumFeatures('Collider', true)} />
+                            <ToolbarButton onClick={() => selectedEdgeIds.size > 0 ? handleEdgeAIAction('alchemy') : handleAlchemy()} icon={<FlaskConical className="w-5 h-5 text-emerald-500" />} title="Alchemy" description="Transform multiple notes into gold" disabled={!isReadOnly && (selectedNodeIds.size < 2 && selectedEdgeIds.size === 0)} className="hover:bg-green-50" isLocked={!isReadOnly && !canUsePremiumFeatures('Alchemy', true)} />
+                            <ToolbarButton onClick={() => selectedEdgeIds.size > 0 ? handleEdgeAIAction('spark') : handleSpark()} icon={<Sparkles className="w-5 h-5 fill-current text-yellow-500" />} title="Spark" description="Find serendipitous connections" disabled={!isReadOnly && (selectedNodeIds.size !== 1 && selectedEdgeIds.size === 0)} className="hover:bg-yellow-50" isLocked={!isReadOnly && !canUsePremiumFeatures('Spark', true)} />
+                            <ToolbarButton onClick={() => selectedEdgeIds.size > 0 ? handleEdgeAIAction('logic_guard') : handleLogicScan()} icon={<Shield className="w-5 h-5 text-red-500" />} title="Logic Guard" description="Scan for logical fallacies" disabled={!isReadOnly && (selectedNodeIds.size !== 1 && selectedEdgeIds.size === 0)} className="hover:bg-red-50" isLocked={!isReadOnly && !canUsePremiumFeatures('LogicGuard', true)} />
+                    {!isReadOnly && (
+                        <>
                             <div className="w-px h-8 bg-gray-100 mx-1"></div>
                             <ToolbarButton onClick={undo} icon={<Undo2 className="w-5 h-5" />} title="Undo" description="Revert last change" disabled={historyIndex <= 0} />
                             <ToolbarButton onClick={redo} icon={<Redo2 className="w-5 h-5" />} title="Redo" description="Redo reverted change" disabled={historyIndex >= history.length - 1} />

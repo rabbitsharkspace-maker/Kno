@@ -77,7 +77,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('canvas');
   const [theme] = useState<AppTheme>(AppTheme.MINIMAL);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(!new URLSearchParams(location.search).has('demo'));
   
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [inboxTrash, setInboxTrash] = useState<InboxItem[]>([]);
