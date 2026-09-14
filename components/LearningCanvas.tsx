@@ -3087,6 +3087,10 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
                 return currentNodes;
             });
         } catch (e: any) {
+            // Was silent. The card appeared, ran its animation and vanished, and
+            // the console stayed clean — so a dead model id looked exactly like a
+            // bad API key, and there was nothing to tell them apart by.
+            console.error("Alchemy failed:", e);
             setLocalNodes(prev => prev.filter(n => n.id !== alchemyId));
             setLocalEdges(prev => prev.filter(e => e.target !== alchemyId));
         } finally { setSelectedNodeIds(new Set()); }
