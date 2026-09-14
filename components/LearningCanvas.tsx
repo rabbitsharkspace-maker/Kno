@@ -787,6 +787,13 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
     const [expandedCritiques, setExpandedCritiques] = useState<Record<string, boolean>>({});
 
     const activeCanvas = useMemo(() => canvases?.find(c => c.id === activeCanvasId), [canvases, activeCanvasId]);
+
+    // Every save writes the viewport into the canvas state; nothing ever read it
+    // back, so a canvas always reopened at the origin no matter where you left it.
+    useEffect(() => {
+        const saved = activeCanvas?.state?.viewport;
+        if (saved) setViewport(saved);
+    }, [activeCanvas?.id]);
     const [localNodes, setLocalNodes] = useState<CanvasNode[]>([]);
     const [localEdges, setLocalEdges] = useState<CanvasEdge[]>([]);
     const [localGroups, setLocalGroups] = useState<CanvasGroup[]>([]);
