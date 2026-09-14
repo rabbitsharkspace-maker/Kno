@@ -111,6 +111,9 @@ const App: React.FC = () => {
    */
   const isDemo = new URLSearchParams(location.search).has('demo');
   const isReadOnly = isDemo;
+  // The demo is embedded in a bilingual page, so it follows that page's language:
+  // ?demo=1&lang=zh gets the Chinese canvas and the Chinese interface.
+  const demoZh = isDemo && new URLSearchParams(location.search).get('lang') === 'zh';
 
   const checkGeneralUsage = (silent: boolean = false): boolean => {
     return true;
@@ -311,7 +314,7 @@ const App: React.FC = () => {
     const initData = async () => {
         if (isDemo) {
             try {
-                const demo = await fetch('demo-canvas.json').then(r => r.json());
+                const demo = await fetch(demoZh ? 'demo-canvas-zh.json' : 'demo-canvas.json').then(r => r.json());
                 setLibrary(demo.library || []);
                 setCanvases(demo.canvases || []);
                 setFolders(demo.folders || []);
@@ -967,7 +970,7 @@ const App: React.FC = () => {
                 onUpdateCanvases={setCanvases} 
                 canCreateCanvas={() => true}
                 canUsePremiumFeatures={checkFeatureAccess}
-                systemLanguage={userProfile?.language || localStorage.getItem('system_language') || 'English'}
+                systemLanguage={demoZh ? 'Chinese' : (userProfile?.language || localStorage.getItem('system_language') || 'English')}
                 isReadOnly={isReadOnly}
                 canvasTrash={canvasTrash || []} 
                 onMoveCanvasToTrash={(id) => {const c = canvases.find(x => x.id === id); if(c) {setCanvases(prev => prev.filter(x => x.id !== id)); setCanvasTrash(prev => [c, ...prev]);}}} 

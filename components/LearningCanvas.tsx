@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { critiqueStatusOf, isFallacy } from '../services/critiqueStatus';
 import { 
     ArrowLeft, Database, Inbox, Brain, Trash2, Link, ArrowRight, 
     Loader2, X, AlertTriangle, Zap, Plus, 
@@ -1142,7 +1143,7 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
         try {
             if (format === 'md' || format === 'docx') {
                 const sourceCount = localNodes.length;
-                const fallacyCount = localNodes.filter(n => n.critique?.isSafe === false || n.critique?.structuredAnalysis?.logic.status.toLowerCase().includes('fallacy')).length;
+                const fallacyCount = localNodes.filter(n => isFallacy(n.critique)).length;
                 const insightCount = localNodes.filter(n => ['spark', 'insight', 'synthesis'].includes(n.type)).length;
                 let md = `# Kno Brief: ${activeCanvas.title}\n`;
                 md += `**Date:** ${new Date().toLocaleDateString(getLocaleString(getSystemLanguage()))}\n\n`;
@@ -3716,19 +3717,7 @@ export const LearningCanvas: React.FC<LearningCanvasProps> = ({
                         if (isAlchemy) ringColor = 'ring-emerald-500 border-emerald-500';
                         if (isCollider) ringColor = 'ring-violet-500 border-violet-500';
                         if (isNeuralDump) ringColor = 'ring-blue-600 border-blue-600';
-                        let critiqueStatus = null;
-                        if (critique) {
-                            if (critique.structuredAnalysis) {
-                                const logicStatus = critique.structuredAnalysis.logic?.status?.toLowerCase() || '';
-                                const factualStatus = critique.structuredAnalysis.factual?.status?.toLowerCase() || '';
-                                const balanceStatus = critique.structuredAnalysis.balance?.status?.toLowerCase() || '';
-                                if (logicStatus.includes('fallacy') || factualStatus.includes('unverified')) critiqueStatus = 'danger';
-                                else if (balanceStatus.includes('skewed') || balanceStatus.includes('echo')) critiqueStatus = 'warning';
-                                else critiqueStatus = 'safe';
-                            } else {
-                                critiqueStatus = critique.isSafe ? 'safe' : 'danger';
-                            }
-                        }
+                        const critiqueStatus = critiqueStatusOf(critique);
                         return (
                             <div key={node.id} id={`node-${node.id}`} onPointerDown={(e) => handleNodePointerDown(e, node)} onPointerUp={(e) => { if (drawingEdge || reconnectingEdge) handleEdgeDrawEnd(e, node); }} onDoubleClick={(e) => { 
                                 e.stopPropagation(); 

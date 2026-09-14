@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { critiqueStatusOf, isFallacy } from '../services/critiqueStatus';
 import { Note, AppTheme, QuizAttempt, Platform, Folder, Theme } from '../types';
 import { Trash2, Edit2, Copy, Check, ExternalLink, Play, Loader2, AlertTriangle, Hash, Sparkles, MessageSquare, Save, X, RotateCw, History, CheckCircle2, Shield, ShieldAlert, Award, FlaskConical, Zap, Layers, FileText, HelpCircle, RefreshCw, ChevronLeft, ChevronRight, PlusCircle, Lightbulb, Scale, Eye, Plus, Map, Lock as LockIcon } from 'lucide-react';
 import { regenerateQuiz, getSystemLanguage } from '../services/geminiService';
@@ -416,25 +417,8 @@ export const SmartCard: React.FC<SmartCardProps> = ({
 
   const getCritiqueStatus = () => {
       if (!note.critique) return null;
-      const { isSafe, structuredAnalysis } = note.critique;
-
-      if (structuredAnalysis) {
-          const logicStatus = structuredAnalysis.logic?.status?.toLowerCase() || '';
-          const factualStatus = structuredAnalysis.factual?.status?.toLowerCase() || '';
-          const balanceStatus = structuredAnalysis.balance?.status?.toLowerCase() || '';
-
-          if (logicStatus.includes('fallacy') || logicStatus.includes('flaw') || factualStatus.includes('unverified') || factualStatus.includes('misleading')) {
-              return 'danger';
-          }
-          if (balanceStatus.includes('skewed') || balanceStatus.includes('echo') || balanceStatus.includes('bias')) {
-              return 'warning';
-          }
-          return 'safe';
-      }
-      if (note.critique.issue?.toLowerCase().includes('fallacy') || note.critique.issue?.toLowerCase().includes('flaw')) {
-          return 'danger';
-      }
-      return isSafe ? 'safe' : 'danger';
+      if (!note.critique.structuredAnalysis && isFallacy(note.critique)) return 'danger';
+      return critiqueStatusOf(note.critique);
   };
 
   const critiqueStatus = getCritiqueStatus();
