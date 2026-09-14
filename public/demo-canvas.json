@@ -1,0 +1,7 @@
+{
+  "_note": "Placeholder. Replace with a real export: open Kno, build the canvas, run Alchemy, then export kno_canvases / kno_library from IndexedDB into this shape.",
+  "canvases": [],
+  "library": [],
+  "folders": [],
+  "themes": []
+}

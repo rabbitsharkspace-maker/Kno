@@ -102,7 +102,15 @@ const App: React.FC = () => {
     setOpenaiApiKey(localProfile.openaiApiKey || undefined);
   }, []);
 
-  const isReadOnly = false;
+  /*
+   * Read-only was plumbed through every handler in the canvas and then never
+   * turned on — the flag was hardcoded false. `?demo=1` turns it on and loads a
+   * canvas shipped with the build instead of this browser's own, which is what
+   * lets the real app be embedded somewhere as a thing to look at and move
+   * around in rather than a thing to type into.
+   */
+  const isDemo = new URLSearchParams(location.search).has('demo');
+  const isReadOnly = isDemo;
 
   const checkGeneralUsage = (silent: boolean = false): boolean => {
     return true;
@@ -301,6 +309,21 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initData = async () => {
+        if (isDemo) {
+            try {
+                const demo = await fetch('demo-canvas.json').then(r => r.json());
+                setLibrary(demo.library || []);
+                setCanvases(demo.canvases || []);
+                setFolders(demo.folders || []);
+                setThemes(demo.themes || []);
+                setActiveCanvasId(demo.canvases?.[0]?.id ?? null);
+                setView('canvas');
+                setIsDataLoaded(true);
+            } catch (e) {
+                console.error('Demo canvas failed to load:', e);
+            }
+            return;
+        }
         try {
             const keys = [
                 'kno_inbox', 'kno_inbox_trash', 'kno_library', 'kno_trash', 
